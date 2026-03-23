@@ -70,21 +70,26 @@ is generated automatically inside your Colab session when you run them.
 ```
 DeepChem/
 ├── README.md
-├── deepchem_1.ipynb        ← Step 1: Install dependencies + prepare all 6 datasets
-└── deepchem_2.ipynb        ← Step 2: OLMoAPI — train, predict, evaluate, generate
+├── deepchem_1.ipynb    ← Main notebook: datasets + OLMoAPI + training (all tasks except MOSES)
+└── deepchem_2.ipynb    ← MOSES notebook: MOSES download + generation training (requires GPU)
 ```
+
+### Why two separate notebooks?
+
+MOSES has 1.9M molecules. Downloading and training on it requires a GPU and takes
+significantly longer than the other datasets. To keep the main workflow clean and fast,
+MOSES is isolated in `deepchem_2.ipynb` so you can run it separately when a GPU is
+available, without blocking the rest of the pipeline.
 
 ### What gets generated after running the notebooks
 
-> These folders are **not committed to the repo**. They are created locally in Colab.
+> These folders are **not committed to the repo**. They are created locally in your Colab session.
 
 ```
 # Created by deepchem_1.ipynb
 olmo_llm_datasets/
 ├── pretraining/
 │   └── zinc15_llm.csv          ← 250,000 SMILES for continued pretraining
-├── generation/
-│   └── moses_llm.csv           ← 1,900,000 SMILES for generation
 ├── classification/
 │   ├── sider.csv               ← 1,427 molecules × 27 side-effect tasks
 │   └── muv.csv                 ← 93,087 molecules × 17 virtual screening tasks
@@ -92,74 +97,95 @@ olmo_llm_datasets/
     ├── esol.csv                ← 1,128 molecules, water solubility
     └── lipophilicity.csv       ← 4,200 molecules, lipophilicity
 
-# Created by deepchem_2.ipynb
 olmo_api_checkpoints/
 ├── zinc15/                     ← pretraining checkpoint
-├── moses/                      ← generation checkpoint
 ├── sider/                      ← classification checkpoint
 ├── esol/                       ← regression checkpoint
 └── lipophilicity/              ← regression checkpoint
 
 my_olmo_model/                  ← final saved model (api.save())
+
+# Created by deepchem_2.ipynb
+olmo_llm_datasets/
+└── generation/
+    └── moses_llm.csv           ← 1,900,000 SMILES for generation
+
+olmo_api_checkpoints/
+└── moses/                      ← generation checkpoint
 ```
 
 ---
 
 ## How to Run
 
-### Step 1 — Run `deepchem_1.ipynb` in Google Colab
+### Notebook 1 — `deepchem_1.ipynb`
 
-This notebook handles:
-- Installing all dependencies
-- Downloading and converting all 6 datasets into LLM-ready CSV format
-- Saving everything under `./olmo_llm_datasets/`
+**What it does:**
+- Installs all dependencies
+- Downloads and prepares datasets: ZINC15, SIDER, MUV, ESOL, Lipophilicity
+- Defines the full `OLMoAPI` class
+- Trains on all task types: pretraining (ZINC15), classification (SIDER), regression (ESOL, Lipophilicity)
+- Runs predict, evaluate, and generate
 
-Run all cells top to bottom. Expected output at the end:
+**How to run:**
+
+1. Open `deepchem_1.ipynb` in [Google Colab](https://colab.research.google.com/)
+2. Go to `Runtime → Change runtime type → T4 GPU`
+3. Run all cells top to bottom
+
+Expected output after dataset preparation:
 
 ```
-✅  All LLM-ready datasets saved!
-
-📁 ./olmo_llm_datasets/
-├── generation/     moses_llm.csv        ← ~1.9M SMILES
-├── classification/ sider.csv, muv.csv
-├── regression/     esol.csv, lipophilicity.csv
-└── pretraining/    zinc15_llm.csv
+✅  zinc15   saved → ./olmo_llm_datasets/pretraining/zinc15_llm.csv
+✅  sider    saved → ./olmo_llm_datasets/classification/sider.csv
+✅  muv      saved → ./olmo_llm_datasets/classification/muv.csv
+✅  esol     saved → ./olmo_llm_datasets/regression/esol.csv
+✅  lipophilicity saved → ./olmo_llm_datasets/regression/lipophilicity.csv
 ```
 
-### Step 2 — Run `deepchem_2.ipynb` in Google Colab
+Expected output after training:
 
-> Run this in the **same Colab session** as Step 1, or re-mount your Drive if using
-> persistent storage, so the dataset files are accessible.
-
-This notebook handles:
-- Installing OLMo-specific packages
-- Defining the full `OLMoAPI` class
-- Training on all 4 task types
-- Running prediction, evaluation, and generation
-
-The API initializes the model once and reuses it across all tasks automatically.
-
-### Dependencies (installed inside the notebooks)
-
-```bash
-# deepchem_1.ipynb
-pip install deepchem rdkit
-
-# deepchem_2.ipynb
-pip install "transformers==4.44.0" huggingface_hub
-pip install ai2-olmo>=0.3.0 hf_olmo
-pip install peft deepchem rdkit-pypi scikit-learn accelerate
+```
+Epoch 1/1 | train=0.7307 | val=0.4642   ← esol
+Epoch 1/1 | train=0.9959 | val=0.9431   ← lipophilicity
+Epoch 1/1 | train=0.6829 | val=0.6732   ← sider
+Epoch 1/1 | train=2.2449 | val=0.1721   ← zinc15
 ```
 
-> **`transformers==4.44.0` is pinned intentionally.**
-> See [Engineering Notes](#engineering-notes) for why.
+---
+
+### Notebook 2 — `deepchem_2.ipynb`
+
+**What it does:**
+- Installs dependencies
+- Downloads the MOSES dataset (1.9M molecules)
+- Trains OLMo on molecular generation using MOSES
+
+**Why separate?**
+MOSES is a large dataset (~1.9M SMILES). Downloading and training on it is GPU-intensive
+and time-consuming. It is kept in a separate notebook so it can be run independently
+without affecting the rest of the pipeline.
+
+**How to run:**
+
+1. Open `deepchem_2.ipynb` in [Google Colab](https://colab.research.google.com/)
+2. Go to `Runtime → Change runtime type → T4 GPU` *(GPU is required)*
+3. Run all cells top to bottom
+
+Expected output after MOSES training:
+
+```
+✅  MOSES — 1,936,962 molecules → ./olmo_llm_datasets/generation/moses_llm.csv
+       train=1,584,664 | test=176,075
+
+Epoch 1/1 | train=0.2325 | val=0.2253   ← moses generation
+```
 
 ---
 
 ## Datasets
 
-All datasets are loaded via DeepChem's MolNet inside `deepchem_1.ipynb` and converted
-into a unified LLM-ready format.
+All datasets are loaded via DeepChem's MolNet and converted into a unified LLM-ready format.
 
 ### Why SMILES as text?
 
@@ -191,11 +217,22 @@ Every generated CSV shares this column structure:
 | `task` | Task name (classification/regression only) |
 | `label` | Ground truth value (classification/regression only) |
 
+### Dataset summary
+
+| Dataset | Task | Molecules | Source Notebook |
+|---|---|---|---|
+| ZINC15 | Pretraining | 250,000 | `deepchem_1.ipynb` |
+| SIDER | Classification (27 tasks) | 1,427 | `deepchem_1.ipynb` |
+| MUV | Classification (17 tasks) | 93,087 | `deepchem_1.ipynb` |
+| ESOL | Regression | 1,128 | `deepchem_1.ipynb` |
+| Lipophilicity | Regression | 4,200 | `deepchem_1.ipynb` |
+| MOSES | Generation | 1,900,000 | `deepchem_2.ipynb` |
+
 ---
 
 ## API Reference
 
-Everything below is defined and demonstrated inside `deepchem_2.ipynb`.
+Everything below is defined in `deepchem_1.ipynb`.
 
 ### Initialize
 
@@ -222,7 +259,7 @@ api.list_datasets()
 
 # Dataset          Task Type        File exists    Description
 # zinc15           pretraining      YES            250K drug-like SMILES
-# moses            generation       YES            1.9M SMILES for generation
+# moses            generation       YES            1.9M SMILES (after running notebook 2)
 # sider            classification   YES            1,427 drugs × 27 tasks
 # muv              classification   YES            93,087 molecules × 17 tasks
 # esol             regression       YES            1,128 molecules, solubility
@@ -234,11 +271,14 @@ api.list_datasets()
 ### `api.train()`
 
 ```python
+# In deepchem_1.ipynb
 api.train("zinc15", epochs=1, max_rows=5000)                          # pretraining
-api.train("moses",  epochs=1, max_rows=1000)                          # generation
 api.train("sider",  task="Hepatobiliary disorders", epochs=2)         # classification
 api.train("esol",   epochs=3)                                         # regression
 api.train("lipophilicity", epochs=3)                                  # regression
+
+# In deepchem_2.ipynb
+api.train("moses",  epochs=1, max_rows=1000)                          # generation
 ```
 
 Returns `list[dict]` — `[{epoch, train_loss, val_loss}, ...]`
@@ -278,9 +318,9 @@ api.evaluate("sider", task="Hepatobiliary disorders")    # → roc_auc, avg_prec
 ### `api.generate()`
 
 ```python
-api.generate(n=20)                                                       # unconditional
-api.generate(n=10, prompt="Generate molecule: CC(", temperature=0.7)     # seeded
-api.generate(n=10, prompt="Generate molecule: c1ccc(", temperature=1.0)  # aromatic seed
+api.generate(n=20)                                                        # unconditional
+api.generate(n=10, prompt="Generate molecule: CC(", temperature=0.7)      # seeded
+api.generate(n=10, prompt="Generate molecule: c1ccc(", temperature=1.0)   # aromatic seed
 ```
 
 Returns `list[str]` — decoded output strings.
@@ -293,13 +333,13 @@ Returns `list[str]` — decoded output strings.
 api.status()
 
 # OLMoAPI Status
-# Model      : allenai/OLMo-1B  |  Device: cuda
+# Model   : allenai/OLMo-1B  |  Device: cuda
 # Trained datasets:
-#   moses            task_type=generation       epochs=1  val_loss=0.2253
 #   sider            task_type=classification   epochs=1  val_loss=0.6732
 #   esol             task_type=regression       epochs=1  val_loss=0.4642
 #   lipophilicity    task_type=regression       epochs=1  val_loss=0.9431
 #   zinc15           task_type=pretraining      epochs=1  val_loss=0.1721
+#   moses            task_type=generation       epochs=1  val_loss=0.2253
 ```
 
 ---
@@ -311,23 +351,21 @@ api.save("./my_olmo_model")
 api.load("./my_olmo_model")
 ```
 
-Saves and restores the backbone, tokenizer, and task head together.
-
 ---
 
 ## Results
 
-All results are from 1 epoch of training on subsampled data (Google Colab T4 GPU).
+All results from 1 epoch of training on subsampled data (Google Colab T4 GPU).
 
 ### Training losses
 
-| Dataset | Task Type | Train Loss | Val Loss |
-|---|---|---|---|
-| ZINC15 | Pretraining | 2.2449 | 0.1721 |
-| MOSES | Generation | 0.2325 | 0.2253 |
-| SIDER | Classification | 0.6829 | 0.6732 |
-| ESOL | Regression | 0.7307 | 0.4642 |
-| Lipophilicity | Regression | 0.9959 | 0.9431 |
+| Dataset | Task Type | Notebook | Train Loss | Val Loss |
+|---|---|---|---|---|
+| ZINC15 | Pretraining | `deepchem_1.ipynb` | 2.2449 | 0.1721 |
+| MOSES | Generation | `deepchem_2.ipynb` | 0.2325 | 0.2253 |
+| SIDER | Classification | `deepchem_1.ipynb` | 0.6829 | 0.6732 |
+| ESOL | Regression | `deepchem_1.ipynb` | 0.7307 | 0.4642 |
+| Lipophilicity | Regression | `deepchem_1.ipynb` | 0.9959 | 0.9431 |
 
 ### Evaluation metrics (1 epoch baseline)
 
@@ -340,8 +378,8 @@ All results are from 1 epoch of training on subsampled data (Google Colab T4 GPU
 | SIDER | Avg Precision | 0.5330 |
 | SIDER | Accuracy | 0.5524 |
 
-> These are 1-epoch baselines on subsampled data. Metrics improve substantially with
-> full dataset training over 5–10 epochs.
+> 1-epoch baselines on subsampled data. Metrics improve substantially with full dataset
+> training over 5–10 epochs.
 
 ### Sample generation output (after 1 epoch on MOSES)
 
@@ -351,9 +389,6 @@ All results are from 1 epoch of training on subsampled data (Google Colab T4 GPU
 [3] COc1ccc(CCNC(=O)c2ccc(F)cc2)cc1...
 [4] CCOC(=O)NC(=O)c1cc(-c2ccc(F)cc2)ccc1...
 ```
-
-Structurally plausible SMILES prefixes are generated at 1 epoch; hallucinated suffixes
-reduce with longer training.
 
 ---
 
@@ -379,7 +414,7 @@ OLMoForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16)
 ### 3. CUDA OOM → LoRA rank=8 + batch size 4
 
 OLMo-1B at full precision exhausts T4 VRAM during the backward pass. LoRA with rank=8
-reduces trainable parameters from 1182M to 5.2M (~0.4%) while preserving performance.
+reduces trainable parameters from 1182M to 5.2M (~0.4%).
 
 ```python
 LoraConfig(r=8, lora_alpha=16, lora_dropout=0.05, task_type=TaskType.CAUSAL_LM)
@@ -388,12 +423,13 @@ LoraConfig(r=8, lora_alpha=16, lora_dropout=0.05, task_type=TaskType.CAUSAL_LM)
 ### 4. MUV 10-minute loading bottleneck → vectorized `pd.melt()`
 
 The original dataset conversion iterated over 1.58M rows in a Python `for` loop.
-Replacing it with `pd.melt()` reduced loading time from ~10 minutes to ~3 seconds.
+Replacing it with `pd.melt()` reduced load time from ~10 minutes to ~3 seconds.
 
 ### 5. MOSES 2-hour validation hang → cap validation at 500 rows
 
 MOSES has ~600K validation rows. At batch size 4, one validation pass takes ~2 hours.
-Fixed by sampling 500 validation rows before each training run.
+Fixed by sampling 500 validation rows before each training run. This is also why MOSES
+training lives in a separate notebook — to isolate this GPU-intensive work.
 
 ```python
 va = va.sample(500, random_state=42).reset_index(drop=True)
