@@ -7,7 +7,7 @@
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers%204.44.0-FFD21E?style=flat-square&logo=huggingface&logoColor=black)
 ![DeepChem](https://img.shields.io/badge/DeepChem-2.7%2B-00C4CC?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)
-![GSoC](https://img.shields.io/badge/GSoC-2025-4285F4?style=flat-square&logo=google&logoColor=white)
+![GSoC](https://img.shields.io/badge/GSoC-2026-4285F4?style=flat-square&logo=google&logoColor=white)
 
 **Full integration of `allenai/OLMo-1B` into DeepChem's `HuggingFaceModel` wrapper —
 supporting molecular generation, classification, regression, and continued pretraining
