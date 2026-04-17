@@ -443,7 +443,7 @@ guard at the start of `_predict_df()`.
 
 ---
 
-## Roadmap (GSoC 2025)
+## Roadmap (GSoC 2026)
 
 - [ ] Scale to `allenai/OLMo-7B` with full DeepChem `HuggingFaceModel` integration
 - [ ] Proper `HuggingFaceModel` subclass following DeepChem's conventions
