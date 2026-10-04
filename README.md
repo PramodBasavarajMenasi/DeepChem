@@ -422,10 +422,10 @@ reduces trainable parameters from 1182M to 5.2M (~0.4%).
 LoraConfig(r=8, lora_alpha=16, lora_dropout=0.05, task_type=TaskType.CAUSAL_LM)
 ```
 
-### 4. Planned: vectorize multi-task reshape with `pd.melt` (current loop is slow on MUV)
+### 4. Vectorized multi-task reshape with `pd.melt`
 
-The multi-task conversion currently iterates over rows in a Python `for` loop, which is
-slow on MUV (~1.58M molecule-task rows). Replacing it with `pd.melt()` is planned.
+Replaced the per-row Python loop in `save_smiles_dataset` with a wide→long `pd.melt`,
+which matters for MUV (~1.58M molecule-task rows).
 
 ### 5. MOSES 2-hour validation hang → cap validation at 500 rows
 
