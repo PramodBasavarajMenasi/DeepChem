@@ -32,7 +32,7 @@ This is a proof-of-concept that pairs [OLMo](https://huggingface.co/allenai/OLMo
 | Continued Pretraining | ZINC15 (250K SMILES) | `Molecule: <SMILES>` | ✅ Working |
 | Molecular Generation | MOSES (1.9M SMILES) | `Generate molecule: <SMILES>` | ✅ Working |
 | Binary Classification | SIDER (27 tasks) | `SMILES: <s> TASK: <t> LABEL:` → `0/1` | ✅ Working |
-| Binary Classification | MUV (17 tasks) | `SMILES: <s> TASK: <t> LABEL:` → `0/1` | 🟡 Dataset prepared; training planned |
+| Binary Classification | MUV (17 tasks) | `SMILES: <s> TASK: <t> LABEL:` → `0/1` | 🟡 Data pipeline complete; training run pending (Colab GPU limits) |
 | Regression | ESOL, Lipophilicity | `SMILES: <s> TASK: <t> LABEL:` → float | ✅ Working |
 
 ### Architecture
@@ -73,16 +73,16 @@ is generated automatically inside your Colab session when you run them.
 ```
 DeepChem/
 ├── README.md
-├── deepchem_1.ipynb    ← Main notebook: datasets + OLMoAPI + training (all tasks except MOSES)
-└── deepchem_2.ipynb    ← MOSES notebook: MOSES download + generation training (requires GPU)
+├── deepchem_1.ipynb    ← Main notebook: prepares all datasets (incl. MOSES) + OLMoAPI + training (all tasks except MOSES)
+└── deepchem_2.ipynb    ← MOSES notebook: dataset prep + MOSES generation training (requires GPU)
 ```
 
 ### Why two separate notebooks?
 
-MOSES has 1.9M molecules. Downloading and training on it requires a GPU and takes
-significantly longer than the other datasets. To keep the main workflow clean and fast,
-MOSES is isolated in `deepchem_2.ipynb` so you can run it separately when a GPU is
-available, without blocking the rest of the pipeline.
+MOSES has 1.9M molecules. Training on it requires a GPU and takes significantly longer
+than the other datasets. To keep the main workflow clean and fast, MOSES training is
+isolated in `deepchem_2.ipynb` so you can run it separately when a GPU is available,
+without blocking the rest of the pipeline.
 
 ### What gets generated after running the notebooks
 
@@ -93,6 +93,8 @@ available, without blocking the rest of the pipeline.
 olmo_llm_datasets/
 ├── pretraining/
 │   └── zinc15_llm.csv          ← 250,000 SMILES for continued pretraining
+├── generation/
+│   └── moses_llm.csv           ← 1.9M SMILES for generation
 ├── classification/
 │   ├── sider.csv               ← 1,427 molecules × 27 side-effect tasks
 │   └── muv.csv                 ← 93,087 molecules × 17 virtual screening tasks
@@ -109,10 +111,6 @@ olmo_api_checkpoints/
 my_olmo_model/                  ← final saved model (api.save())
 
 # Created by deepchem_2.ipynb
-olmo_llm_datasets/
-└── generation/
-    └── moses_llm.csv           ← 1,900,000 SMILES for generation
-
 olmo_api_checkpoints/
 └── moses/                      ← generation checkpoint
 ```
@@ -125,10 +123,10 @@ olmo_api_checkpoints/
 
 **What it does:**
 - Installs all dependencies
-- Downloads and prepares datasets: ZINC15, SIDER, MUV, ESOL, Lipophilicity
+- Downloads and prepares datasets: ZINC15, MOSES, SIDER, MUV, ESOL, Lipophilicity
 - Defines the full `OLMoAPI` class
 - Trains on all task types: pretraining (ZINC15), classification (SIDER), regression (ESOL, Lipophilicity)
-- MUV is prepared but not trained yet (training planned)
+- MUV: data pipeline complete; training run pending (Colab GPU limits)
 - Runs predict, evaluate, and generate
 
 **How to run:**
@@ -140,20 +138,21 @@ olmo_api_checkpoints/
 Expected output after dataset preparation:
 
 ```
-✅  zinc15   saved → ./olmo_llm_datasets/pretraining/zinc15_llm.csv
+✅  MOSES    saved → ./olmo_llm_datasets/generation/moses_llm.csv
 ✅  sider    saved → ./olmo_llm_datasets/classification/sider.csv
 ✅  muv      saved → ./olmo_llm_datasets/classification/muv.csv
 ✅  esol     saved → ./olmo_llm_datasets/regression/esol.csv
 ✅  lipophilicity saved → ./olmo_llm_datasets/regression/lipophilicity.csv
+✅  ZINC15   saved → ./olmo_llm_datasets/pretraining/zinc15_llm.csv
 ```
 
 Expected output after training:
 
 ```
+Epoch 1/1 | train=2.2449 | val=0.1721   ← zinc15
+Epoch 1/1 | train=0.6829 | val=0.6732   ← sider
 Epoch 1/1 | train=0.7307 | val=0.4642   ← esol
 Epoch 1/1 | train=0.9959 | val=0.9431   ← lipophilicity
-Epoch 1/1 | train=0.6829 | val=0.6732   ← sider
-Epoch 1/1 | train=2.2449 | val=0.1721   ← zinc15
 ```
 
 ---
@@ -161,13 +160,13 @@ Epoch 1/1 | train=2.2449 | val=0.1721   ← zinc15
 ### Notebook 2 — `deepchem_2.ipynb`
 
 **What it does:**
-- Installs dependencies
-- Downloads the MOSES dataset (1.9M molecules)
+- Installs dependencies and prepares datasets (incl. MOSES, 1.9M molecules)
+- Applies runtime fixes (validation capped at 500 rows, task-head auto-rebuild)
 - Trains OLMo on molecular generation using MOSES
 
 **Why separate?**
-MOSES is a large dataset (~1.9M SMILES). Downloading and training on it is GPU-intensive
-and time-consuming. It is kept in a separate notebook so it can be run independently
+MOSES is a large dataset (~1.9M SMILES). Training on it is GPU-intensive and
+time-consuming. It is kept in a separate notebook so it can be run independently
 without affecting the rest of the pipeline.
 
 **How to run:**
@@ -180,7 +179,7 @@ Expected output after MOSES training:
 
 ```
 ✅  MOSES — 1,936,962 molecules → ./olmo_llm_datasets/generation/moses_llm.csv
-       train=1,584,664 | test=176,075
+       train=1,584,663 | test=176,074
 
 Epoch 1/1 | train=0.2325 | val=0.2253   ← moses generation
 ```
@@ -189,7 +188,9 @@ Epoch 1/1 | train=0.2325 | val=0.2253   ← moses generation
 
 ## Datasets
 
-All datasets are loaded via DeepChem's MolNet and converted into a unified LLM-ready format.
+All datasets except MOSES are loaded via DeepChem's MolNet (scaffold split); MOSES is
+downloaded from the official molecularsets repository. All are converted into a unified
+LLM-ready format.
 
 ### Why SMILES as text?
 
@@ -223,14 +224,14 @@ Every generated CSV shares this column structure:
 
 ### Dataset summary
 
-| Dataset | Task | Molecules | Source Notebook | Status |
+| Dataset | Task | Molecules | Trained in | Status |
 |---|---|---|---|---|
 | ZINC15 | Pretraining | 250,000 | `deepchem_1.ipynb` | Trained |
 | SIDER | Classification (27 tasks) | 1,427 | `deepchem_1.ipynb` | Trained |
-| MUV | Classification (17 tasks) | 93,087 | `deepchem_1.ipynb` | Dataset prepared; training planned |
+| MUV | Classification (17 tasks) | 93,087 | `deepchem_1.ipynb` | Data pipeline complete; training run pending (Colab GPU limits) |
 | ESOL | Regression | 1,128 | `deepchem_1.ipynb` | Trained |
 | Lipophilicity | Regression | 4,200 | `deepchem_1.ipynb` | Trained |
-| MOSES | Generation | 1,900,000 | `deepchem_2.ipynb` | Trained |
+| MOSES | Generation | 1,936,962 | `deepchem_2.ipynb` | Trained |
 
 ---
 
@@ -263,9 +264,9 @@ api.list_datasets()
 
 # Dataset          Task Type        File exists    Description
 # zinc15           pretraining      YES            250K drug-like SMILES
-# moses            generation       YES            1.9M SMILES (after running notebook 2)
+# moses            generation       YES            1.9M SMILES
 # sider            classification   YES            1,427 drugs × 27 tasks
-# muv              classification   YES            93,087 molecules × 17 tasks (training planned)
+# muv              classification   YES            93,087 molecules × 17 tasks
 # esol             regression       YES            1,128 molecules, solubility
 # lipophilicity    regression       YES            4,200 molecules, logD
 ```
@@ -275,14 +276,17 @@ api.list_datasets()
 ### `api.train()`
 
 ```python
-# In deepchem_1.ipynb
-api.train("zinc15", epochs=1, max_rows=5000)                          # pretraining
-api.train("sider",  task="Hepatobiliary disorders", epochs=2)         # classification
-api.train("esol",   epochs=3)                                         # regression
-api.train("lipophilicity", epochs=3)                                  # regression
+# Runs used for the results below (deepchem_1.ipynb)
+api.train("zinc15", epochs=1, max_rows=500)                               # pretraining
+api.train("sider",  task="Hepatobiliary disorders", epochs=1, max_rows=1000)  # classification
+api.train("esol",   epochs=1, max_rows=1000)                              # regression
+api.train("lipophilicity", epochs=1, max_rows=1000)                       # regression
 
-# In deepchem_2.ipynb
-api.train("moses",  epochs=1, max_rows=1000)                          # generation
+# deepchem_2.ipynb
+api.train("moses",  epochs=1, max_rows=1000)                              # generation
+
+# Same API, pending run
+api.train("muv", task="MUV-466", epochs=1, max_rows=1000)                 # classification
 ```
 
 Returns `list[dict]` — `[{epoch, train_loss, val_loss}, ...]`
@@ -336,13 +340,15 @@ Returns `list[str]` — decoded output strings.
 ```python
 api.status()
 
-# OLMoAPI Status
+# OLMoAPI Status  (deepchem_1.ipynb session)
 # Model   : allenai/OLMo-1B  |  Device: cuda
 # Trained datasets:
 #   sider            task_type=classification   epochs=1  val_loss=0.6732
 #   esol             task_type=regression       epochs=1  val_loss=0.4642
 #   lipophilicity    task_type=regression       epochs=1  val_loss=0.9431
 #   zinc15           task_type=pretraining      epochs=1  val_loss=0.1721
+#
+# (deepchem_2.ipynb session)
 #   moses            task_type=generation       epochs=1  val_loss=0.2253
 ```
 
@@ -384,6 +390,9 @@ Run on a Google Colab T4 GPU.
 | SIDER | Accuracy | 0.5524 |
 
 ### Sample generation output (after 1 epoch on MOSES)
+
+Leading SMILES fragments shown; raw outputs continue with trailing non-SMILES tokens
+(no stop criterion or RDKit filtering yet — see Known Limitations).
 
 ```
 [1] CCn1c(C(=O)NCc2ccccc2)n(Cc3noc(C)n3)c1...
@@ -429,7 +438,7 @@ which matters for MUV (~1.58M molecule-task rows).
 
 ### 5. MOSES 2-hour validation hang → cap validation at 500 rows
 
-MOSES has ~600K validation rows. At batch size 4, one validation pass takes ~2 hours.
+MOSES has a very large held-out split. At batch size 4, one validation pass takes ~2 hours.
 Fixed by sampling 500 validation rows before each training run. This is also why MOSES
 training lives in a separate notebook — to isolate this GPU-intensive work.
 
@@ -447,9 +456,10 @@ guard at the start of `_predict_df()`.
 
 ## Known Limitations
 
-- **Shared task head across tasks.** Multi-task datasets (SIDER, MUV) use one task head for every task; the task name is only signalled through the prompt.
+- **Shared task head.** One task head is kept per task type, so datasets of the same type (e.g. ESOL then Lipophilicity) reuse and overwrite it; the task name is only signalled through the prompt. Per-dataset heads are planned.
 - **Padding not masked in the LM loss.** Pad tokens are not set to `-100` in the labels, so they contribute to the pretraining / generation loss.
-- **Generated SMILES not yet validated with RDKit.** Outputs from `api.generate()` are not checked for chemical validity, uniqueness, or novelty.
+- **Generated SMILES not yet validated with RDKit.** Outputs from `api.generate()` have no stop criterion and are not checked for chemical validity, uniqueness, or novelty.
+- **MUV training run pending.** The MUV data pipeline is complete and uses the same `api.train()` call; the run is pending due to Colab GPU limits.
 
 ---
 
@@ -457,7 +467,8 @@ guard at the start of `_predict_df()`.
 
 - [ ] Scale to `allenai/OLMo-7B` with full DeepChem `HuggingFaceModel` integration
 - [ ] Proper `HuggingFaceModel` subclass following DeepChem's conventions
-- [ ] Multi-task training (all 27 SIDER tasks simultaneously)
+- [ ] Complete MUV training and evaluation
+- [ ] Per-dataset task heads and multi-task training (all 27 SIDER tasks simultaneously)
 - [ ] SMILES validity filtering on generated outputs via RDKit
 - [ ] Benchmark against ChemBERTa and MolBERT on ESOL / Lipophilicity / SIDER
 - [ ] Unit tests integrated into DeepChem's CI pipeline
