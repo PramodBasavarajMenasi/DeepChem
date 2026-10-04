@@ -5,15 +5,17 @@
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers%204.44.0-FFD21E?style=flat-square&logo=huggingface&logoColor=black)
-![DeepChem](https://img.shields.io/badge/DeepChem-2.7%2B-00C4CC?style=flat-square)
+![DeepChem](https://img.shields.io/badge/DeepChem-2.5%2B-00C4CC?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)
 ![GSoC](https://img.shields.io/badge/GSoC-2026-4285F4?style=flat-square&logo=google&logoColor=white)
 
-**Full integration of `allenai/OLMo-1B` into DeepChem's `HuggingFaceModel` wrapper —
-supporting molecular generation, classification, regression, and continued pretraining
-from a single unified API.**
+**Prototype for a GSoC proposal: validates an OLMo-1B pipeline on DeepChem MolNet datasets before scaling to OLMo-7B.**
 
-[Overview](#overview) · [Repository Structure](#repository-structure) · [How to Run](#how-to-run) · [Datasets](#datasets) · [API Reference](#api-reference) · [Results](#results) · [Engineering Notes](#engineering-notes)
+The pipeline is built on DeepChem MolNet loaders and scaffold splits; a `HuggingFaceModel` subclass is planned for the OLMo-7B phase.
+It covers molecular generation, classification, regression, and continued pretraining
+through a single `OLMoAPI` class.
+
+[Overview](#overview) · [Repository Structure](#repository-structure) · [How to Run](#how-to-run) · [Datasets](#datasets) · [API Reference](#api-reference) · [Results](#results) · [Engineering Notes](#engineering-notes) · [Known Limitations](#known-limitations)
 
 </div>
 
@@ -21,7 +23,7 @@ from a single unified API.**
 
 ## Overview
 
-This project integrates [OLMo](https://huggingface.co/allenai/OLMo-1B) (Open Language Model by AllenAI) into [DeepChem](https://github.com/deepchem/deepchem) as a first-class LLM backend for molecular machine learning. It demonstrates that a general-purpose decoder-only transformer can be adapted for all major molecular ML task types using SMILES strings as the input language.
+This is a proof-of-concept that pairs [OLMo](https://huggingface.co/allenai/OLMo-1B) (Open Language Model by AllenAI) with [DeepChem](https://github.com/deepchem/deepchem) datasets for molecular machine learning. It checks that a general-purpose decoder-only transformer can be adapted to the major molecular ML task types using SMILES strings as the input language, as groundwork for an OLMo-7B integration.
 
 ### What's implemented
 
@@ -29,7 +31,8 @@ This project integrates [OLMo](https://huggingface.co/allenai/OLMo-1B) (Open Lan
 |---|---|---|---|
 | Continued Pretraining | ZINC15 (250K SMILES) | `Molecule: <SMILES>` | ✅ Working |
 | Molecular Generation | MOSES (1.9M SMILES) | `Generate molecule: <SMILES>` | ✅ Working |
-| Binary Classification | SIDER (27 tasks), MUV (17 tasks) | `SMILES: <s> TASK: <t> LABEL:` → `0/1` | ✅ Working |
+| Binary Classification | SIDER (27 tasks) | `SMILES: <s> TASK: <t> LABEL:` → `0/1` | ✅ Working |
+| Binary Classification | MUV (17 tasks) | `SMILES: <s> TASK: <t> LABEL:` → `0/1` | 🟡 Dataset prepared; training planned |
 | Regression | ESOL, Lipophilicity | `SMILES: <s> TASK: <t> LABEL:` → float | ✅ Working |
 
 ### Architecture
@@ -125,6 +128,7 @@ olmo_api_checkpoints/
 - Downloads and prepares datasets: ZINC15, SIDER, MUV, ESOL, Lipophilicity
 - Defines the full `OLMoAPI` class
 - Trains on all task types: pretraining (ZINC15), classification (SIDER), regression (ESOL, Lipophilicity)
+- MUV is prepared but not trained yet (training planned)
 - Runs predict, evaluate, and generate
 
 **How to run:**
@@ -219,14 +223,14 @@ Every generated CSV shares this column structure:
 
 ### Dataset summary
 
-| Dataset | Task | Molecules | Source Notebook |
-|---|---|---|---|
-| ZINC15 | Pretraining | 250,000 | `deepchem_1.ipynb` |
-| SIDER | Classification (27 tasks) | 1,427 | `deepchem_1.ipynb` |
-| MUV | Classification (17 tasks) | 93,087 | `deepchem_1.ipynb` |
-| ESOL | Regression | 1,128 | `deepchem_1.ipynb` |
-| Lipophilicity | Regression | 4,200 | `deepchem_1.ipynb` |
-| MOSES | Generation | 1,900,000 | `deepchem_2.ipynb` |
+| Dataset | Task | Molecules | Source Notebook | Status |
+|---|---|---|---|---|
+| ZINC15 | Pretraining | 250,000 | `deepchem_1.ipynb` | Trained |
+| SIDER | Classification (27 tasks) | 1,427 | `deepchem_1.ipynb` | Trained |
+| MUV | Classification (17 tasks) | 93,087 | `deepchem_1.ipynb` | Dataset prepared; training planned |
+| ESOL | Regression | 1,128 | `deepchem_1.ipynb` | Trained |
+| Lipophilicity | Regression | 4,200 | `deepchem_1.ipynb` | Trained |
+| MOSES | Generation | 1,900,000 | `deepchem_2.ipynb` | Trained |
 
 ---
 
@@ -261,7 +265,7 @@ api.list_datasets()
 # zinc15           pretraining      YES            250K drug-like SMILES
 # moses            generation       YES            1.9M SMILES (after running notebook 2)
 # sider            classification   YES            1,427 drugs × 27 tasks
-# muv              classification   YES            93,087 molecules × 17 tasks
+# muv              classification   YES            93,087 molecules × 17 tasks (training planned)
 # esol             regression       YES            1,128 molecules, solubility
 # lipophilicity    regression       YES            4,200 molecules, logD
 ```
@@ -355,7 +359,8 @@ api.load("./my_olmo_model")
 
 ## Results
 
-All results from 1 epoch of training on subsampled data (Google Colab T4 GPU).
+**1-epoch smoke tests on 500–1000 rows (feasibility check, not tuned benchmarks).**
+Run on a Google Colab T4 GPU.
 
 ### Training losses
 
@@ -367,7 +372,7 @@ All results from 1 epoch of training on subsampled data (Google Colab T4 GPU).
 | ESOL | Regression | `deepchem_1.ipynb` | 0.7307 | 0.4642 |
 | Lipophilicity | Regression | `deepchem_1.ipynb` | 0.9959 | 0.9431 |
 
-### Evaluation metrics (1 epoch baseline)
+### Evaluation metrics (1-epoch smoke test)
 
 | Dataset | Metric | Value |
 |---|---|---|
@@ -377,9 +382,6 @@ All results from 1 epoch of training on subsampled data (Google Colab T4 GPU).
 | SIDER | ROC-AUC | 0.5190 |
 | SIDER | Avg Precision | 0.5330 |
 | SIDER | Accuracy | 0.5524 |
-
-> 1-epoch baselines on subsampled data. Metrics improve substantially with full dataset
-> training over 5–10 epochs.
 
 ### Sample generation output (after 1 epoch on MOSES)
 
@@ -420,10 +422,10 @@ reduces trainable parameters from 1182M to 5.2M (~0.4%).
 LoraConfig(r=8, lora_alpha=16, lora_dropout=0.05, task_type=TaskType.CAUSAL_LM)
 ```
 
-### 4. MUV 10-minute loading bottleneck → vectorized `pd.melt()`
+### 4. Planned: vectorize multi-task reshape with `pd.melt` (current loop is slow on MUV)
 
-The original dataset conversion iterated over 1.58M rows in a Python `for` loop.
-Replacing it with `pd.melt()` reduced load time from ~10 minutes to ~3 seconds.
+The multi-task conversion currently iterates over rows in a Python `for` loop, which is
+slow on MUV (~1.58M molecule-task rows). Replacing it with `pd.melt()` is planned.
 
 ### 5. MOSES 2-hour validation hang → cap validation at 500 rows
 
@@ -443,6 +445,14 @@ guard at the start of `_predict_df()`.
 
 ---
 
+## Known Limitations
+
+- **Shared task head across tasks.** Multi-task datasets (SIDER, MUV) use one task head for every task; the task name is only signalled through the prompt.
+- **Padding not masked in the LM loss.** Pad tokens are not set to `-100` in the labels, so they contribute to the pretraining / generation loss.
+- **Generated SMILES not yet validated with RDKit.** Outputs from `api.generate()` are not checked for chemical validity, uniqueness, or novelty.
+
+---
+
 ## Roadmap (GSoC 2026)
 
 - [ ] Scale to `allenai/OLMo-7B` with full DeepChem `HuggingFaceModel` integration
@@ -458,11 +468,11 @@ guard at the start of `_predict_df()`.
 ## Acknowledgements
 
 - [AllenAI](https://allenai.org/) for the OLMo model family
-- [DeepChem](https://github.com/deepchem/deepchem) for MolNet loaders and the `HuggingFaceModel` wrapper
-- GSoC 2025 mentors: Riya, Harindhar
+- [DeepChem](https://github.com/deepchem/deepchem) for MolNet loaders and scaffold splits
+- GSoC 2026 mentors: Riya, Harindhar
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License.
